@@ -110,6 +110,7 @@ class XKCDBot(Plugin):
     subscriber: Type[Subscriber]
     db: orm.Session
     latest_id: int
+    poll_task: asyncio.Future
 
     @classmethod
     def get_config_class(cls) -> Type[BaseProxyConfig]:
@@ -156,11 +157,14 @@ class XKCDBot(Plugin):
         self.client.add_command_handler(COMMAND_SUBSCRIBE_XKCD, self.subscribe)
         self.client.add_command_handler(COMMAND_UNSUBSCRIBE_XKCD, self.unsubscribe)
 
+        self.poll_task = asyncio.ensure_future(self.poll_xkcd(), loop=self.loop)
+
     async def stop(self) -> None:
         self.client.remove_command_handler(COMMAND_XKCD, self.get)
         self.client.remove_command_handler(COMMAND_LATEST_XKCD, self.latest)
         self.client.remove_command_handler(COMMAND_SUBSCRIBE_XKCD, self.subscribe)
         self.client.remove_command_handler(COMMAND_UNSUBSCRIBE_XKCD, self.unsubscribe)
+        self.poll_task.cancel()
 
     async def _get_xkcd_info(self, url: str) -> Optional[XKCDInfo]:
         resp = await self.http.get(url)
@@ -217,6 +221,7 @@ class XKCDBot(Plugin):
             await self.client.send_text(room_id, text=xkcd.alt)
 
     async def broadcast(self, xkcd: XKCDInfo) -> None:
+        self.log.debug(f"Broadcasting xkcd {xkcd.num}")
         subscribers = list(self.subscriber.query.all())
         random.shuffle(subscribers)
         spam_sleep = self.config["spam_sleep"]
@@ -234,11 +239,12 @@ class XKCDBot(Plugin):
         latest = await self.get_latest_xkcd()
         self.latest_id = latest.num
         while True:
-            await asyncio.sleep(self.config["poll_interval"], loop=self.loop)
+            self.log.debug("Polling latest xkcd...")
             latest = await self.get_latest_xkcd()
             if latest.num > self.latest_id:
                 self.latest_id = latest.num
                 await self.broadcast(latest)
+            await asyncio.sleep(self.config["poll_interval"], loop=self.loop)
 
     async def subscribe(self, evt: MessageEvent) -> None:
         sub = self.subscriber.query.get(evt.room_id)
