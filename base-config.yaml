@@ -1,0 +1,7 @@
+# Whether or not to use inline images for sending comics.
+inline: false
+# The interval to poll xkcd for new comics in.
+poll_interval: 300
+# The time to sleep between send requests when broadcasting a new xkcd comic.
+# Set to 0 to disable sleep or -1 to run all requests asynchronously at once.
+spam_sleep: 2
