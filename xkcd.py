@@ -205,12 +205,13 @@ class XKCDBot(Plugin):
     async def send_xkcd(self, room_id: RoomID, xkcd: XKCDInfo) -> None:
         info = await self._get_media_info(xkcd.img)
         if self.config["inline"]:
-            await self.client.send_text(room_id, text=f"**{xkcd.title}\n{xkcd.img}\n{xkcd.alt}",
-                                        html=(f"<strong>{xkcd.safe_title}</strong><br/>"
+            await self.client.send_text(room_id, text=(f"{xkcd.num}: **{xkcd.title}\n"
+                                                       f"{xkcd.img}\n{xkcd.alt}"),
+                                        html=(f"{xkcd.num}: <strong>{xkcd.safe_title}</strong><br/>"
                                               f"<img src='{info.mxc_uri}' title='{xkcd.alt}'/>"))
         else:
-            await self.client.send_text(room_id, text=f"**{xkcd.title}**",
-                                        html=f"<strong>{xkcd.safe_title}</strong>")
+            await self.client.send_text(room_id, text=f"{xkcd.num}: **{xkcd.title}**",
+                                        html=f"{xkcd.num}: <strong>{xkcd.safe_title}</strong>")
             await self.client.send_image(room_id, url=info.mxc_uri, file_name=info.file_name,
                                          info=ImageInfo(
                                              mimetype=info.mime_type,
