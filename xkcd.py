@@ -250,7 +250,6 @@ class XKCDBot(Plugin):
         latest = await self.get_latest_xkcd()
         self.latest_id = latest.num
         while True:
-            self.log.debug("Polling latest xkcd...")
             latest = await self.get_latest_xkcd()
             if latest.num > self.latest_id:
                 self.latest_id = latest.num
