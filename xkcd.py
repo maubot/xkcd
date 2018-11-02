@@ -236,6 +236,16 @@ class XKCDBot(Plugin):
                     await asyncio.sleep(spam_sleep)
 
     async def poll_xkcd(self) -> None:
+        try:
+            await self._poll_xkcd()
+        except asyncio.CancelledError:
+            self.log.debug("Polling stopped")
+            pass
+        except Exception:
+            self.log.exception("Failed to poll xkcd")
+
+    async def _poll_xkcd(self) -> None:
+        self.log.debug("Polling started")
         latest = await self.get_latest_xkcd()
         self.latest_id = latest.num
         while True:
