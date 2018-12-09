@@ -1,0 +1,10 @@
+id: xyz.maubot.xkcd
+version: 1.0.0
+license: AGPL-3.0-or-later
+modules:
+- xkcd
+main_class: XKCDBot
+extra_files:
+- base-config.yaml
+dependencies:
+- feedparser>=5.1
