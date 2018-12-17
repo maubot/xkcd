@@ -203,6 +203,12 @@ class XKCDBot(Plugin):
             return cache
 
     async def send_xkcd(self, room_id: RoomID, xkcd: XKCDInfo) -> None:
+        try:
+            await self._send_xkcd(room_id, xkcd)
+        except Exception:
+            self.log.exception(f"Failed to send xkcd {xkcd.num} to {room_id}")
+
+    async def _send_xkcd(self, room_id: RoomID, xkcd: XKCDInfo) -> None:
         info = await self._get_media_info(xkcd.img)
         if self.config["inline"]:
             await self.client.send_text(room_id, text=(f"{xkcd.num}: **{xkcd.title}\n"
