@@ -8,3 +8,4 @@ extra_files:
 - base-config.yaml
 dependencies:
 - feedparser>=5.1
+database: true

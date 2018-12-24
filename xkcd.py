@@ -25,7 +25,8 @@ import aiohttp
 
 from mautrix.types import ContentURI, RoomID, UserID, ImageInfo, SerializableAttrs
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
-from maubot import Plugin, CommandSpec, Command, Argument, MessageEvent
+from maubot import Plugin, MessageEvent
+from maubot.handlers import command
 
 try:
     import magic
@@ -117,13 +118,13 @@ class XKCDBot(Plugin):
         return Config
 
     async def start(self) -> None:
+        await super().start()
         self.config.load_and_update()
-        db_engine = self.request_db_engine()
-        db_factory = orm.sessionmaker(bind=db_engine)
+        db_factory = orm.sessionmaker(bind=self.database)
         db_session = orm.scoped_session(db_factory)
 
         base = declarative_base()
-        base.metadata.bind = db_engine
+        base.metadata.bind = self.database
 
         class MediaCacheImpl(MediaCache, base):
             query = db_session.query_property()
@@ -138,32 +139,10 @@ class XKCDBot(Plugin):
         self.db = db_session
         self.latest_id = 0
 
-        self.set_command_spec(CommandSpec(
-            commands=[
-                Command(
-                    syntax=COMMAND_XKCD,
-                    description="Get a specific xkcd comic",
-                    arguments={ARG_NUMBER: Argument(matches="[0-9]+", required=True,
-                                                    description="The number of the comic to get")}
-                ),
-                Command(syntax=COMMAND_LATEST_XKCD, description="Get the latest xkcd comic"),
-                Command(syntax=COMMAND_SUBSCRIBE_XKCD, description="Subscribe to xkcd updates"),
-                Command(syntax=COMMAND_UNSUBSCRIBE_XKCD,
-                        description="Unsubscribe from xkcd updates"),
-            ],
-        ))
-        self.client.add_command_handler(COMMAND_XKCD, self.get)
-        self.client.add_command_handler(COMMAND_LATEST_XKCD, self.latest)
-        self.client.add_command_handler(COMMAND_SUBSCRIBE_XKCD, self.subscribe)
-        self.client.add_command_handler(COMMAND_UNSUBSCRIBE_XKCD, self.unsubscribe)
-
         self.poll_task = asyncio.ensure_future(self.poll_xkcd(), loop=self.loop)
 
     async def stop(self) -> None:
-        self.client.remove_command_handler(COMMAND_XKCD, self.get)
-        self.client.remove_command_handler(COMMAND_LATEST_XKCD, self.latest)
-        self.client.remove_command_handler(COMMAND_SUBSCRIBE_XKCD, self.subscribe)
-        self.client.remove_command_handler(COMMAND_UNSUBSCRIBE_XKCD, self.unsubscribe)
+        await super().stop()
         self.poll_task.cancel()
 
     async def _get_xkcd_info(self, url: str) -> Optional[XKCDInfo]:
@@ -262,6 +241,20 @@ class XKCDBot(Plugin):
                 await self.broadcast(latest)
             await asyncio.sleep(self.config["poll_interval"], loop=self.loop)
 
+    @command.new("xkcd", help="View an xkcd comic", require_subcommand=False, arg_fallthrough=False)
+    @command.argument("number", parser=lambda val: int(val) if val else None, required=False)
+    async def xkcd(self, evt: MessageEvent, number: Optional[int]) -> None:
+        try:
+            xkcd = await (self.get_xkcd(number) if number else self.get_latest_xkcd())
+        except aiohttp.ClientResponseError as e:
+            await evt.respond(f"Failed to get xkcd: {e.message}")
+            return
+        if xkcd:
+            await self.send_xkcd(evt.room_id, xkcd)
+            return
+        await evt.respond("xkcd not found")
+
+    @xkcd.subcommand("subscribe", help="Subscribe to xkcd updates")
     async def subscribe(self, evt: MessageEvent) -> None:
         sub = self.subscriber.query.get(evt.room_id)
         if sub is not None:
@@ -273,6 +266,7 @@ class XKCDBot(Plugin):
         self.db.commit()
         await evt.reply("Subscribed to xkcd updates successfully!")
 
+    @xkcd.subcommand("unsubscribe", help="Unsubscribe from xkcd updates")
     async def unsubscribe(self, evt: MessageEvent) -> None:
         sub = self.subscriber.query.get(evt.room_id)
         if sub is None:
@@ -281,23 +275,3 @@ class XKCDBot(Plugin):
         self.db.delete(sub)
         self.db.commit()
         await evt.reply("Unsubscribed from xkcd updates successfully :(")
-
-    async def latest(self, evt: MessageEvent) -> None:
-        try:
-            xkcd = await self.get_latest_xkcd()
-        except aiohttp.ClientResponseError as e:
-            await evt.respond(f"Failed to get xkcd: {e.message}")
-            return
-        await self.send_xkcd(evt.room_id, xkcd)
-
-    async def get(self, evt: MessageEvent) -> None:
-        number = int(evt.content.command.arguments[ARG_NUMBER].lower())
-        try:
-            xkcd = await self.get_xkcd(number)
-        except aiohttp.ClientResponseError as e:
-            await evt.respond(f"Failed to get xkcd: {e.message}")
-            return
-        if xkcd:
-            await self.send_xkcd(evt.room_id, xkcd)
-            return
-        await evt.respond("xkcd not found")
