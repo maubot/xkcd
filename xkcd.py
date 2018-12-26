@@ -173,7 +173,7 @@ class XKCDBot(Plugin):
             if Image is not None:
                 image = Image.open(BytesIO(data))
                 width, height = image.size
-            uri = await self.client.upload_media(data)
+            uri = await self.client.upload_media(data, mime_type=mime_type)
             cache = self.media_cache(xkcd_url=image_url, mxc_uri=uri, file_name=file_name,
                                      mime_type=mime_type, width=width, height=height,
                                      size=len(data))
