@@ -102,7 +102,7 @@ class XKCDIndex:
         self.transcript = transcript
 
     def __lt__(self, other: 'XKCDIndex') -> bool:
-        return self.id < other.id
+        return self.id > other.id
 
     def __gt__(self, other: 'XKCDIndex') -> bool:
         return self.id < other.id
