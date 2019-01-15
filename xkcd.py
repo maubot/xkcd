@@ -330,17 +330,17 @@ class XKCDBot(Plugin):
     @command.argument("query", pass_raw=True)
     async def search(self, evt: MessageEvent, query: str) -> None:
         sql_query = f"%{query}%"
-        limit = self.config["max_search_results"]
         results = self.xkcd_index.query.filter(or_(self.xkcd_index.title.like(sql_query),
                                                    self.xkcd_index.alt.like(sql_query),
                                                    self.xkcd_index.transcript.like(sql_query))
-                                               ).limit(limit * 2).all()
+                                               ).all()
         if len(results) == 0:
             await evt.reply("No results :(")
         else:
             results = list(self._sort_search_results(results, query))
             msg = "Results:\n\n"
             more_results = None
+            limit = self.config["max_search_results"]
             if len(results) > limit:
                 more_results = len(results) - limit, results[limit][1]
                 results = results[:limit]
