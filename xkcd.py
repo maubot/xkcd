@@ -39,12 +39,6 @@ try:
 except ImportError:
     Image = None
 
-ARG_NUMBER = "$number"
-COMMAND_XKCD = f"xkcd {ARG_NUMBER}"
-COMMAND_LATEST_XKCD = "xkcd"
-COMMAND_SUBSCRIBE_XKCD = "xkcd subscribe"
-COMMAND_UNSUBSCRIBE_XKCD = "xkcd unsubscribe"
-
 
 @dataclass
 class XKCDInfo(SerializableAttrs['XKCDInfo']):
