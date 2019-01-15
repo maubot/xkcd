@@ -101,6 +101,15 @@ class XKCDIndex:
         self.alt = alt
         self.transcript = transcript
 
+    def __lt__(self, other: 'XKCDIndex') -> bool:
+        return self.id < other.id
+
+    def __gt__(self, other: 'XKCDIndex') -> bool:
+        return self.id < other.id
+
+    def __eq__(self, other: 'XKCDIndex') -> bool:
+        return self.id == other.id
+
 
 class Subscriber:
     __tablename__ = "subscriber"
@@ -321,19 +330,28 @@ class XKCDBot(Plugin):
     @command.argument("query", pass_raw=True)
     async def search(self, evt: MessageEvent, query: str) -> None:
         sql_query = f"%{query}%"
-        limit = self.config["max_search_results"] * 2
+        limit = self.config["max_search_results"]
         results = self.xkcd_index.query.filter(or_(self.xkcd_index.title.like(sql_query),
                                                    self.xkcd_index.alt.like(sql_query),
                                                    self.xkcd_index.transcript.like(sql_query))
-                                               ).limit(limit).all()
+                                               ).limit(limit * 2).all()
         if len(results) == 0:
             await evt.reply("No results :(")
         else:
-            await evt.reply("Results:\n\n"
-                            + "\n".join(f"* [{result.id}](https://xkcd.com/{result.id}): "
-                                        f"{result.title} ({similarity}% match)"
-                                        for result, similarity
-                                        in self._sort_search_results(results, query)))
+            results = list(self._sort_search_results(results, query))
+            msg = "Results:\n\n"
+            more_results = None
+            if len(results) > limit:
+                more_results = len(results) - limit, results[limit][1]
+                results = results[:limit]
+            msg += "\n".join(f"* [{result.id}](https://xkcd.com/{result.id}): "
+                             f"{result.title} ({similarity} % match)"
+                             for result, similarity in results)
+            if more_results:
+                number, similarity = more_results
+                msg += (f"\n\nThere were {number} other results "
+                        f"with a similarity lower than {similarity + 0.1} %")
+            await evt.reply(msg)
 
     @xkcd.subcommand("subscribe", help="Subscribe to xkcd updates")
     async def subscribe(self, evt: MessageEvent) -> None:
