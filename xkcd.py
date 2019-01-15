@@ -13,12 +13,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from typing import Awaitable, Optional, Type, Tuple
+from typing import Awaitable, Optional, Type, List, Iterable, Tuple
 from io import BytesIO
+from difflib import SequenceMatcher
 import asyncio
 import random
 
-from sqlalchemy import Column, String, Integer, orm
+from sqlalchemy import Column, String, Integer, Text, orm, or_
 from sqlalchemy.ext.declarative import declarative_base
 from attr import dataclass
 import aiohttp
@@ -87,6 +88,20 @@ class MediaCache:
         self.size = size
 
 
+class XKCDIndex:
+    __tablename__ = "xkcd_index"
+    id: int = Column(Integer, primary_key=True)
+    title: str = Column(Text)
+    alt: str = Column(Text)
+    transcript: str = Column(Text)
+
+    def __init__(self, id: int, title: str, alt: str, transcript: str) -> None:
+        self.id = id
+        self.title = title
+        self.alt = alt
+        self.transcript = transcript
+
+
 class Subscriber:
     __tablename__ = "subscriber"
     query: orm.Query = None
@@ -104,6 +119,8 @@ class Config(BaseProxyConfig):
         helper.copy("inline")
         helper.copy("poll_interval")
         helper.copy("spam_sleep")
+        helper.copy("allow_reindex")
+        helper.copy("max_search_results")
 
 
 class XKCDBot(Plugin):
@@ -129,11 +146,15 @@ class XKCDBot(Plugin):
         class MediaCacheImpl(MediaCache, base):
             query = db_session.query_property()
 
+        class XKCDIndexImpl(XKCDIndex, base):
+            query = db_session.query_property()
+
         class SubscriberImpl(Subscriber, base):
             query = db_session.query_property()
 
         self.media_cache = MediaCacheImpl
         self.subscriber = SubscriberImpl
+        self.xkcd_index = XKCDIndexImpl
         base.metadata.create_all()
 
         self.db = db_session
@@ -145,11 +166,17 @@ class XKCDBot(Plugin):
         await super().stop()
         self.poll_task.cancel()
 
+    def _index_info(self, info: XKCDInfo) -> None:
+        self.db.merge(self.xkcd_index(info.num, info.title, info.alt, info.transcript))
+        self.db.commit()
+
     async def _get_xkcd_info(self, url: str) -> Optional[XKCDInfo]:
         resp = await self.http.get(url)
         if resp.status == 200:
             data = await resp.json()
-            return XKCDInfo.deserialize(data)
+            info = XKCDInfo.deserialize(data)
+            self._index_info(info)
+            return info
         resp.raise_for_status()
         return None
 
@@ -253,6 +280,60 @@ class XKCDBot(Plugin):
             await self.send_xkcd(evt.room_id, xkcd)
             return
         await evt.respond("xkcd not found")
+
+    async def _try_get_xkcd(self, number: int) -> Optional[XKCDInfo]:
+        try:
+            return await self.get_xkcd(number)
+        except aiohttp.ClientResponseError:
+            self.log.exception(f"Failed to get xkcd {number}")
+            return None
+
+    @xkcd.subcommand("reindex", help="Fetch and store info about every XKCD to date for searching.")
+    async def reindex(self, evt: MessageEvent) -> None:
+        if not self.config["allow_reindex"]:
+            await evt.reply("Sorry, the reindex command has been disabled on this instance.")
+            return
+        self.config["allow_reindex"] = False
+        self.config.save()
+        latest = await self.get_latest_xkcd()
+        await evt.reply("Reindexing XKCD database...")
+        results = await asyncio.gather(*[self._try_get_xkcd(i) for i in range(1, latest.num)],
+                                       loop=self.loop)
+        nones = len([result for result in results if result is None])
+        await evt.reply(f"Reindexing complete. Fetched {len(results) - nones} xkcds and failed to "
+                        f"fetch {nones} xkcds.")
+
+    def _index_similarity(self, result: XKCDIndex, query: str) -> float:
+        query = query.lower()
+        title_sim = SequenceMatcher(None, result.title.strip().lower(), query).ratio()
+        alt_sim = SequenceMatcher(None, result.alt.strip().lower(), query).ratio()
+        transcript_sim = SequenceMatcher(None, result.transcript.strip().lower(), query).ratio()
+        sim = max(title_sim, alt_sim, transcript_sim)
+        return round(sim * 100, 1)
+
+    def _sort_search_results(self, results: List[XKCDIndex], query: str
+                             ) -> Iterable[Tuple[XKCDIndex, float]]:
+        similarity = (self._index_similarity(result, query) for result in results)
+        return ((result, similarity) for similarity, result
+                in sorted(zip(similarity, results), reverse=True))
+
+    @xkcd.subcommand("search", help="Search for a relevant XKCD")
+    @command.argument("query", pass_raw=True)
+    async def search(self, evt: MessageEvent, query: str) -> None:
+        sql_query = f"%{query}%"
+        limit = self.config["max_search_results"] * 2
+        results = self.xkcd_index.query.filter(or_(self.xkcd_index.title.like(sql_query),
+                                                   self.xkcd_index.alt.like(sql_query),
+                                                   self.xkcd_index.transcript.like(sql_query))
+                                               ).limit(limit).all()
+        if len(results) == 0:
+            await evt.reply("No results :(")
+        else:
+            await evt.reply("Results:\n\n"
+                            + "\n".join(f"* [{result.id}](https://xkcd.com/{result.id}): "
+                                        f"{result.title} ({similarity}% match)"
+                                        for result, similarity
+                                        in self._sort_search_results(results, query)))
 
     @xkcd.subcommand("subscribe", help="Subscribe to xkcd updates")
     async def subscribe(self, evt: MessageEvent) -> None:
