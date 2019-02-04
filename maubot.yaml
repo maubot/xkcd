@@ -7,6 +7,7 @@ modules:
 main_class: XKCDBot
 extra_files:
 - base-config.yaml
-dependencies:
-- feedparser>=5.1
+soft_dependencies:
+- python-magic>=0.4
+- Pillow>=5.1
 database: true
