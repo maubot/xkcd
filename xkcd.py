@@ -124,6 +124,7 @@ class Config(BaseProxyConfig):
         helper.copy("spam_sleep")
         helper.copy("allow_reindex")
         helper.copy("max_search_results")
+        helper.copy("base_command")
 
 
 class XKCDBot(Plugin):
@@ -271,7 +272,8 @@ class XKCDBot(Plugin):
                 await self.broadcast(latest)
             await asyncio.sleep(self.config["poll_interval"], loop=self.loop)
 
-    @command.new("xkcd", help="View an xkcd comic", require_subcommand=False, arg_fallthrough=False)
+    @command.new(name=lambda self: self.config["base_command"],
+                 help="View an xkcd comic", require_subcommand=False, arg_fallthrough=False)
     @command.argument("number", parser=lambda val: int(val) if val else None, required=False)
     async def xkcd(self, evt: MessageEvent, number: Optional[int]) -> None:
         try:

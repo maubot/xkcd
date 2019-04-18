@@ -10,3 +10,5 @@ spam_sleep: 10
 allow_reindex: true
 # Maximum number of search results
 max_search_results: 10
+# Base command without the prefix (!).
+base_command: xkcd
