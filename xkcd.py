@@ -322,32 +322,52 @@ class XKCDBot(Plugin):
         return ((result, similarity) for similarity, result
                 in sorted(zip(similarity, results), reverse=True))
 
-    @xkcd.subcommand("search", help="Search for a relevant XKCD")
-    @command.argument("query", pass_raw=True)
-    async def search(self, evt: MessageEvent, query: str) -> None:
+    def _search(self, query: str) -> Optional[List[Tuple[XKCDIndex, float]]]:
         sql_query = f"%{query}%"
         results = self.xkcd_index.query.filter(or_(self.xkcd_index.title.like(sql_query),
                                                    self.xkcd_index.alt.like(sql_query),
                                                    self.xkcd_index.transcript.like(sql_query))
                                                ).all()
         if len(results) == 0:
+            return None
+        return list(self._sort_search_results(results, query))
+
+    @xkcd.subcommand("lucky", help="Search for a relevant XKCD, and view the first result")
+    @command.argument("query", pass_raw=True)
+    async def feeling_lucky(self, evt: MessageEvent, query: str) -> None:
+        results = self._search(query)
+        if not results:
             await evt.reply("No results :(")
-        else:
-            results = list(self._sort_search_results(results, query))
-            msg = "Results:\n\n"
-            more_results = None
-            limit = self.config["max_search_results"]
-            if len(results) > limit:
-                more_results = len(results) - limit, results[limit][1]
-                results = results[:limit]
-            msg += "\n".join(f"* [{result.id}](https://xkcd.com/{result.id}): "
-                             f"{result.title} ({similarity} % match)"
-                             for result, similarity in results)
-            if more_results:
-                number, similarity = more_results
-                msg += (f"\n\nThere were {number} other results "
-                        f"with a similarity lower than {similarity + 0.1} %")
-            await evt.reply(msg)
+            return
+        result = results[0][0]
+        xkcd = await self.get_xkcd(result.id)
+        if not xkcd:
+            await evt.reply(f"Found result {result.id}: {result.title}, "
+                            f"but failed to fetch content")
+            return
+        await self.send_xkcd(evt.room_id, xkcd)
+
+    @xkcd.subcommand("search", help="Search for a relevant XKCD")
+    @command.argument("query", pass_raw=True)
+    async def search(self, evt: MessageEvent, query: str) -> None:
+        results = self._search(query)
+        if not results:
+            await evt.reply("No results :(")
+            return
+        msg = "Results:\n\n"
+        more_results = None
+        limit = self.config["max_search_results"]
+        if len(results) > limit:
+            more_results = len(results) - limit, results[limit][1]
+            results = results[:limit]
+        msg += "\n".join(f"* [{result.id}](https://xkcd.com/{result.id}): "
+                         f"{result.title} ({similarity} % match)"
+                         for result, similarity in results)
+        if more_results:
+            number, similarity = more_results
+            msg += (f"\n\nThere were {number} other results "
+                    f"with a similarity lower than {similarity + 0.1} %")
+        await evt.reply(msg)
 
     @xkcd.subcommand("subscribe", help="Subscribe to xkcd updates")
     async def subscribe(self, evt: MessageEvent) -> None:
