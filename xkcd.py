@@ -259,14 +259,17 @@ class XKCDBot(Plugin):
             self.log.debug("Polling stopped")
             pass
         except Exception:
-            self.log.exception("Failed to poll xkcd")
+            self.log.fatal("Failed to poll xkcd", exc_info=True)
 
     async def _poll_xkcd(self) -> None:
         self.log.debug("Polling started")
         latest = await self.get_latest_xkcd()
         self.latest_id = latest.num
         while True:
-            latest = await self.get_latest_xkcd()
+            try:
+                latest = await self.get_latest_xkcd()
+            except Exception:
+                self.log.exception("Failed to get latest xkcd")
             if latest.num > self.latest_id:
                 self.latest_id = latest.num
                 await self.broadcast(latest)
