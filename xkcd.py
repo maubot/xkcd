@@ -24,10 +24,11 @@ from sqlalchemy.ext.declarative import declarative_base
 from attr import dataclass
 import aiohttp
 
-from mautrix.types import ContentURI, RoomID, UserID, ImageInfo, SerializableAttrs
+from mautrix.types import (ContentURI, RoomID, UserID, ImageInfo, SerializableAttrs, EventType,
+                           StateEvent)
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
 from maubot import Plugin, MessageEvent
-from maubot.handlers import command
+from maubot.handlers import command, event
 
 try:
     import magic
@@ -393,3 +394,12 @@ class XKCDBot(Plugin):
         self.db.delete(sub)
         self.db.commit()
         await evt.reply("Unsubscribed from xkcd updates successfully :(")
+
+    @event.on(EventType.ROOM_TOMBSTONE)
+    async def tombstone(self, evt: StateEvent) -> None:
+        if not evt.content.replacement_room:
+            return
+        sub = self.db.query(self.subscriber).get(evt.room_id)
+        if sub:
+            sub.room_id = evt.content.replacement_room
+            self.db.commit()
