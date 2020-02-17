@@ -25,7 +25,8 @@ from attr import dataclass
 import aiohttp
 
 from mautrix.types import (ContentURI, RoomID, UserID, ImageInfo, SerializableAttrs, EventType,
-                           StateEvent)
+                           StateEvent, TextMessageEventContent, Format, MessageType,
+                           MediaMessageEventContent)
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
 from maubot import Plugin, MessageEvent
 from maubot.handlers import command, event
@@ -222,20 +223,31 @@ class XKCDBot(Plugin):
     async def _send_xkcd(self, room_id: RoomID, xkcd: XKCDInfo) -> None:
         info = await self._get_media_info(xkcd.img)
         if self.config["inline"]:
-            await self.client.send_text(room_id, text=(f"{xkcd.num}: **{xkcd.title}\n"
-                                                       f"{xkcd.img}\n{xkcd.alt}"),
-                                        html=(f"{xkcd.num}: <strong>{xkcd.safe_title}</strong><br/>"
-                                              f"<img src='{info.mxc_uri}' title='{xkcd.alt}'/>"))
+            content = TextMessageEventContent(
+                msgtype=MessageType.TEXT, format=Format.HTML,
+                external_url=f"https://xkcd.com/{xkcd.num}",
+                body=f"{xkcd.num}: **{xkcd.title}\n"
+                     f"{xkcd.img}\n{xkcd.alt}",
+                formatted_body=f"{xkcd.num}: <strong>{xkcd.safe_title}</strong><br/>"
+                               f"<img src='{info.mxc_uri}' title='{xkcd.alt}'/>")
+            content["license"] = "CC-BY-NC-2.5"
+            content["license_url"] = "https://xkcd.com/license.html"
+            await self.client.send_message(room_id, content)
         else:
             await self.client.send_text(room_id, text=f"{xkcd.num}: **{xkcd.title}**",
                                         html=f"{xkcd.num}: <strong>{xkcd.safe_title}</strong>")
-            await self.client.send_image(room_id, url=info.mxc_uri, file_name=info.file_name,
-                                         info=ImageInfo(
-                                             mimetype=info.mime_type,
-                                             size=info.size,
-                                             width=info.width,
-                                             height=info.height,
-                                         ))
+            content = MediaMessageEventContent(url=info.mxc_uri, body=info.file_name,
+                                               msgtype=MessageType.IMAGE,
+                                               external_url=f"https://xkcd.com/{xkcd.num}",
+                                               info=ImageInfo(
+                                                   mimetype=info.mime_type,
+                                                   size=info.size,
+                                                   width=info.width,
+                                                   height=info.height,
+                                               ),)
+            content["license"] = "CC-BY-NC-2.5"
+            content["license_url"] = "https://xkcd.com/license.html"
+            await self.client.send_message(room_id, content)
             await self.client.send_text(room_id, text=xkcd.alt)
 
     async def broadcast(self, xkcd: XKCDInfo) -> None:
