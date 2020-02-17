@@ -226,7 +226,7 @@ class XKCDBot(Plugin):
             content = TextMessageEventContent(
                 msgtype=MessageType.TEXT, format=Format.HTML,
                 external_url=f"https://xkcd.com/{xkcd.num}",
-                body=f"{xkcd.num}: **{xkcd.title}\n"
+                body=f"{xkcd.num}: **{xkcd.title}**\n"
                      f"{xkcd.img}\n{xkcd.alt}",
                 formatted_body=f"{xkcd.num}: <strong>{xkcd.safe_title}</strong><br/>"
                                f"<img src='{info.mxc_uri}' title='{xkcd.alt}'/>")
