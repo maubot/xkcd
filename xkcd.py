@@ -257,8 +257,7 @@ class XKCDBot(Plugin):
         spam_sleep = self.config["spam_sleep"]
         if spam_sleep < 0:
             await asyncio.gather(*[self.send_xkcd(sub.room_id, xkcd)
-                                   for sub in subscribers],
-                                 loop=self.loop)
+                                   for sub in subscribers])
         else:
             for sub in subscribers:
                 await self.send_xkcd(sub.room_id, xkcd)
@@ -318,8 +317,7 @@ class XKCDBot(Plugin):
         self.config.save()
         latest = await self.get_latest_xkcd()
         await evt.reply("Reindexing XKCD database...")
-        results = await asyncio.gather(*[self._try_get_xkcd(i) for i in range(1, latest.num)],
-                                       loop=self.loop)
+        results = await asyncio.gather(*[self._try_get_xkcd(i) for i in range(1, latest.num)])
         nones = len([result for result in results if result is None])
         await evt.reply(f"Reindexing complete. Fetched {len(results) - nones} xkcds and failed to "
                         f"fetch {nones} xkcds.")
