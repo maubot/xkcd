@@ -43,7 +43,7 @@ except ImportError:
 
 
 @dataclass
-class XKCDInfo(SerializableAttrs['XKCDInfo']):
+class XKCDInfo(SerializableAttrs):
     year: str
     month: str
     day: str
