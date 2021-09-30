@@ -192,7 +192,7 @@ class XKCDBot(Plugin):
     def get_xkcd(self, num: int) -> Awaitable[XKCDInfo]:
         return self._get_xkcd_info(f"https://xkcd.com/{num}/info.0.json")
 
-    async def _get_media_info(self, image_url: str) -> MediaCache:
+    async def _get_media_info(self, image_url: str) -> Optional[MediaCache]:
         cache = self.media_cache.query.get(image_url)
         if cache is not None:
             return cache
@@ -213,6 +213,10 @@ class XKCDBot(Plugin):
             self.db.add(cache)
             self.db.commit()
             return cache
+        else:
+            self.log.error(f"Getting media info for {image_url} returned {resp.status}: "
+                           f"{await resp.text()}")
+            return None
 
     async def send_xkcd(self, room_id: RoomID, xkcd: XKCDInfo) -> None:
         try:
@@ -222,6 +226,8 @@ class XKCDBot(Plugin):
 
     async def _send_xkcd(self, room_id: RoomID, xkcd: XKCDInfo) -> None:
         info = await self._get_media_info(xkcd.img)
+        if not info:
+            return
         if self.config["inline"]:
             content = TextMessageEventContent(
                 msgtype=MessageType.TEXT, format=Format.HTML,
@@ -283,8 +289,10 @@ class XKCDBot(Plugin):
             except Exception:
                 self.log.exception("Failed to get latest xkcd")
             if latest.num > self.latest_id:
-                self.latest_id = latest.num
-                await self.broadcast(latest)
+                info = await self._get_media_info(latest.img)
+                if info:
+                    self.latest_id = latest.num
+                    await self.broadcast(latest)
             await asyncio.sleep(self.config["poll_interval"], loop=self.loop)
 
     @command.new(name=lambda self: self.config["base_command"],
