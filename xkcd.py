@@ -134,7 +134,7 @@ class XKCDBot(Plugin):
     subscriber: Type[Subscriber]
     db: orm.Session
     latest_id: int
-    poll_task: asyncio.Future
+    poll_task: asyncio.Task
 
     @classmethod
     def get_config_class(cls) -> Type[BaseProxyConfig]:
@@ -166,7 +166,7 @@ class XKCDBot(Plugin):
         self.db = db_session
         self.latest_id = 0
 
-        self.poll_task = asyncio.ensure_future(self.poll_xkcd(), loop=self.loop)
+        self.poll_task = asyncio.create_task(self.poll_xkcd())
 
     async def stop(self) -> None:
         await super().stop()

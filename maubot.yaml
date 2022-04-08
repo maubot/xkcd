@@ -11,3 +11,4 @@ soft_dependencies:
 - python-magic>=0.4
 - Pillow>=5.1
 database: true
+config: true
