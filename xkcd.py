@@ -293,7 +293,7 @@ class XKCDBot(Plugin):
                 if info:
                     self.latest_id = latest.num
                     await self.broadcast(latest)
-            await asyncio.sleep(self.config["poll_interval"], loop=self.loop)
+            await asyncio.sleep(self.config["poll_interval"])
 
     @command.new(name=lambda self: self.config["base_command"],
                  help="View an xkcd comic", require_subcommand=False, arg_fallthrough=False)
