@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from typing import Awaitable, Optional, Type, List, Iterable, Tuple
+from typing import Awaitable, Optional, Type, List, Iterable, Tuple, Any
 from io import BytesIO
 from difflib import SequenceMatcher
 import asyncio
@@ -127,6 +127,12 @@ class Config(BaseProxyConfig):
         helper.copy("allow_reindex")
         helper.copy("max_search_results")
         helper.copy("base_command")
+
+
+def non_empty_string(x: str) -> Tuple[str, Any]:
+    if not x:
+        return x, None
+    return "", x
 
 
 class XKCDBot(Plugin):
@@ -355,7 +361,7 @@ class XKCDBot(Plugin):
         return list(self._sort_search_results(results, query))
 
     @xkcd.subcommand("lucky", help="Search for a relevant XKCD, and view the first result")
-    @command.argument("query", pass_raw=True)
+    @command.argument("query", pass_raw=True, required=True, parser=non_empty_string)
     async def feeling_lucky(self, evt: MessageEvent, query: str) -> None:
         results = self._search(query)
         if not results:
@@ -370,7 +376,7 @@ class XKCDBot(Plugin):
         await self.send_xkcd(evt.room_id, xkcd)
 
     @xkcd.subcommand("search", help="Search for a relevant XKCD")
-    @command.argument("query", pass_raw=True)
+    @command.argument("query", pass_raw=True, required=True, parser=non_empty_string)
     async def search(self, evt: MessageEvent, query: str) -> None:
         results = self._search(query)
         if not results:
