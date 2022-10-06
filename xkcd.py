@@ -397,6 +397,15 @@ class XKCDBot(Plugin):
                     f"with a similarity lower than {similarity + 0.1} %")
         await evt.reply(msg)
 
+    @xkcd.subcommand("random", help="Show a random XKCD")
+    async def random(self, evt: MessageEvent) -> None:
+        random_id = random.randint(1, self.latest_id)
+        xkcd = await self.get_xkcd(random_id)
+        if not xkcd:
+            await evt.reply(f"Chose {random_id}, but failed to fetch content")
+            return
+        await self.send_xkcd(evt.room_id, xkcd)
+
     @xkcd.subcommand("subscribe", help="Subscribe to xkcd updates")
     async def subscribe(self, evt: MessageEvent) -> None:
         sub = self.subscriber.query.get(evt.room_id)
