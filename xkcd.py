@@ -282,8 +282,9 @@ class XKCDBot(Plugin):
         except asyncio.CancelledError:
             self.log.debug("Polling stopped")
             pass
-        except Exception:
+        except Exception as e:
             self.log.fatal("Failed to poll xkcd", exc_info=True)
+            self.log.fatal(str(e))
 
     async def _poll_xkcd(self) -> None:
         self.log.debug("Polling started")
