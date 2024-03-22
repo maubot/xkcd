@@ -43,6 +43,13 @@ except ImportError:
 
 
 @dataclass
+class MSC2530MediaMessageEventContent(MediaMessageEventContent):
+    filename: str = None
+    formatted_body: str = None
+    format: Format = None
+
+
+@dataclass
 class XKCDInfo(SerializableAttrs):
     year: str
     month: str
@@ -246,7 +253,7 @@ class XKCDBot(Plugin):
             content["license_url"] = "https://xkcd.com/license.html"
             await self.client.send_message(room_id, content)
         else:
-            content = MediaMessageEventContent(
+            content = MSC2530MediaMessageEventContent(
                 msgtype=MessageType.IMAGE,
                 format=Format.HTML,
                 external_url=f"https://xkcd.com/{xkcd.num}",
