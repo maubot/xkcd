@@ -246,21 +246,26 @@ class XKCDBot(Plugin):
             content["license_url"] = "https://xkcd.com/license.html"
             await self.client.send_message(room_id, content)
         else:
-            await self.client.send_text(room_id, text=f"{xkcd.num}: **{xkcd.title}**",
-                                        html=f"{xkcd.num}: <strong>{xkcd.safe_title}</strong>")
-            content = MediaMessageEventContent(url=info.mxc_uri, body=info.file_name,
-                                               msgtype=MessageType.IMAGE,
-                                               external_url=f"https://xkcd.com/{xkcd.num}",
-                                               info=ImageInfo(
-                                                   mimetype=info.mime_type,
-                                                   size=info.size,
-                                                   width=info.width,
-                                                   height=info.height,
-                                               ),)
+            content = MediaMessageEventContent(
+                msgtype=MessageType.IMAGE,
+                format=Format.HTML,
+                external_url=f"https://xkcd.com/{xkcd.num}",
+                url=info.mxc_uri,
+                filename=info.file_name,
+                body=f"{xkcd.num}: **{xkcd.title}**\n{xkcd.alt}",
+                formatted_body=f"{xkcd.num}: <strong>{xkcd.safe_title}</strong>"
+                               f"<br/><i>{xkcd.alt}</i>",
+                info=ImageInfo(
+                    mimetype=info.mime_type,
+                    size=info.size,
+                    width=info.width,
+                    height=info.height,
+                ),
+            )
             content["license"] = "CC-BY-NC-2.5"
             content["license_url"] = "https://xkcd.com/license.html"
+
             await self.client.send_message(room_id, content)
-            await self.client.send_text(room_id, text=xkcd.alt)
 
     async def broadcast(self, xkcd: XKCDInfo) -> None:
         self.log.debug(f"Broadcasting xkcd {xkcd.num}")
